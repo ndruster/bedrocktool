@@ -12,6 +12,7 @@ import (
 	"github.com/bedrock-tool/bedrocktool/utils/auth"
 	"github.com/bedrock-tool/bedrocktool/utils/franchise/gatherings"
 	"github.com/google/uuid"
+	"github.com/sandertv/gophertunnel/minecraft/p2p"
 	"github.com/sandertv/gophertunnel/minecraft/realms"
 )
 
@@ -30,6 +31,7 @@ type ConnectInfo struct {
 	gathering  *gatherings.Gathering
 	realm      *realms.Realm
 	experience *gatherings.FeaturedServer
+	world      *p2p.World
 }
 
 func (c *ConnectInfo) getGathering(ctx context.Context, name string) (*gatherings.Gathering, error) {
@@ -93,7 +95,11 @@ func (c *ConnectInfo) getRealm(ctx context.Context, name string) (*realms.Realm,
 	if c.realm != nil && strings.EqualFold(c.realm.Name, name) || strconv.Itoa(c.realm.ID) == name {
 		return c.realm, nil
 	}
-	realms, err := c.Account.Realms().Realms(ctx)
+	realmsClient, err := c.Account.Realms(ctx)
+	if err != nil {
+		return nil, err
+	}
+	realms, err := realmsClient.Realms(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -242,6 +248,11 @@ func (c *ConnectInfo) SetFeaturedServer(server *gatherings.FeaturedServer) {
 	} else {
 		c.Value = server.Address
 	}
+}
+
+func (c *ConnectInfo) SetWorld(world *p2p.World) {
+	c.Value = "nethernet:" + world.HandleID().String()
+	c.world = world
 }
 
 type parsedConnectInfo struct {

@@ -7,18 +7,18 @@ import (
 	"sync/atomic"
 
 	"github.com/bedrock-tool/bedrocktool/ui/messages"
-	"github.com/bedrock-tool/bedrocktool/utils/auth/xbox"
+	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"github.com/sirupsen/logrus"
 )
 
 var ErrNotLoggedIn = errors.New("not Logged In")
 
-var defaultDeviceType = &xbox.DeviceTypeAndroid
+var defaultDeviceType = &auth.AndroidConfig
 
 type authSrv struct {
 	log     *logrus.Entry
 	env     string
-	handler xbox.MSAuthHandler
+	handler auth.AuthCodeHandler
 	account atomic.Pointer[Account]
 
 	authCtxCancel atomic.Pointer[context.CancelFunc]
@@ -32,6 +32,14 @@ func (a *authSrv) SetEnv(env string) {
 	a.env = env
 }
 
+func (a *authSrv) setAccount(acc *Account) *Account {
+	prevAcc := a.account.Swap(acc)
+	if prevAcc != nil {
+		prevAcc.Close()
+	}
+	return prevAcc
+}
+
 // reads token from storage if there is one
 func (a *authSrv) LoadAccount(name string) (err error) {
 	tokenInfo, err := readAuth[tokenInfo](tokenFileName(name))
@@ -41,7 +49,7 @@ func (a *authSrv) LoadAccount(name string) (err error) {
 	if err != nil {
 		return err
 	}
-	a.account.Store(&Account{
+	a.setAccount(&Account{
 		token: tokenInfo,
 		name:  name,
 		env:   a.env,
@@ -55,34 +63,38 @@ func (a *authSrv) LoggedIn() bool {
 }
 
 // performs microsoft login using the handler passed
-func (a *authSrv) SetHandler(handler xbox.MSAuthHandler) (err error) {
+func (a *authSrv) SetHandler(handler auth.AuthCodeHandler) (err error) {
 	a.handler = handler
 	return nil
 }
 
-func (a *authSrv) Login(ctx context.Context, deviceType *xbox.DeviceType, name string) (err error) {
-	liveToken, err := xbox.RequestLiveTokenWriter(ctx, deviceType, a.handler)
+func (a *authSrv) Login(ctx context.Context, conf *auth.Config, name string) (err error) {
+	if conf == nil {
+		conf = &auth.AndroidConfig
+	}
+	liveToken, err := conf.RequestLiveTokenContext(ctx, a.handler)
 	if err != nil {
 		return err
 	}
-	a.account.Store(&Account{
-		token: &tokenInfo{
-			Token:      liveToken,
-			DeviceType: deviceType.DeviceType,
-		},
-		name: name,
-		env:  a.env,
-	})
-	if err = writeAuth(tokenFileName(name), *liveToken); err != nil {
+	tokenInfo := tokenInfo{
+		Token:    liveToken,
+		ClientID: conf.ClientID,
+	}
+	if err = writeAuth(tokenFileName(name), tokenInfo); err != nil {
 		return err
 	}
+	a.setAccount(&Account{
+		token: &tokenInfo,
+		name:  name,
+		env:   a.env,
+	})
 	return nil
 }
 
 func (a *authSrv) Logout() {
-	acc := a.account.Swap(nil)
-	os.Remove(tokenFileName(acc.name))
-	os.Remove(chainFileName(acc.name))
+	prevAcc := a.setAccount(nil)
+	os.Remove(tokenFileName(prevAcc.name))
+	os.Remove(chainFileName(prevAcc.name))
 }
 
 func (a *authSrv) Account() *Account {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"reflect"
@@ -17,15 +18,19 @@ import (
 	"github.com/bedrock-tool/bedrocktool/ui/messages"
 	"github.com/bedrock-tool/bedrocktool/utils"
 	"github.com/bedrock-tool/bedrocktool/utils/connectinfo"
-	"github.com/bedrock-tool/bedrocktool/utils/franchise/signaling"
 	"github.com/bedrock-tool/bedrocktool/utils/proxy/blobcache"
 	"github.com/bedrock-tool/bedrocktool/utils/proxy/pcap2"
 	"github.com/bedrock-tool/bedrocktool/utils/proxy/resourcepacks"
+	"github.com/df-mc/go-nethernet"
+	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/p2p"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/resource"
+	"github.com/sandertv/gophertunnel/minecraft/service/signaling"
+	"github.com/sandertv/gophertunnel/minecraft/service/signaling/messaging"
 	"github.com/sirupsen/logrus"
 )
 
@@ -45,8 +50,10 @@ type Session struct {
 	packetLogger       *packetLogger
 	packetLoggerClient *packetLogger
 
-	listener  *minecraft.Listener
-	blobCache *blobcache.Blobcache
+	signaling  io.Closer
+	p2pSession *p2p.Session
+	listener   *minecraft.Listener
+	blobCache  *blobcache.Blobcache
 
 	Server minecraft.IConn
 	Client minecraft.IConn
@@ -151,16 +158,8 @@ func (s *Session) newResourcePackHandler(ctx context.Context) *resourcepacks.Res
 	return rpHandler
 }
 
-func (s *Session) Run() error {
-	defer s.cancelCtx(errors.New("done"))
-
-	messages.SendEvent(&messages.EventConnectStateUpdate{
-		State:      messages.ConnectStateBegin,
-		ListenAddr: s.settings.ListenAddress,
-	})
-
-	var err error
-	s.blobCache, err = blobcache.NewBlobCache(s.log, func(pk packet.Packet) error {
+func (s *Session) newBlobCache() (*blobcache.Blobcache, error) {
+	return blobcache.NewBlobCache(s.log, func(pk packet.Packet) error {
 		return s.Server.WritePacket(pk)
 	}, func() minecraft.IConn {
 		return s.Client
@@ -170,6 +169,17 @@ func (s *Session) Run() error {
 	}, func(blobs []protocol.CacheBlob) {
 		s.handlers.OnBlobs(s, blobs)
 	}, s.connectInfo.IsReplay())
+}
+
+func (s *Session) Run() (err error) {
+	defer s.cancelCtx(errors.New("done"))
+
+	messages.SendEvent(&messages.EventConnectStateUpdate{
+		State:      messages.ConnectStateBegin,
+		ListenAddr: s.settings.ListenAddress,
+	})
+
+	s.blobCache, err = s.newBlobCache()
 	if err != nil {
 		return err
 	}
@@ -223,6 +233,12 @@ func (s *Session) Run() error {
 			}
 			_ = s.listener.Close()
 		}()
+	}
+	if s.signaling != nil {
+		defer s.signaling.Close()
+	}
+	if s.p2pSession != nil {
+		defer s.p2pSession.Close()
 	}
 
 	if s.ctx.Err() != nil {
@@ -378,31 +394,22 @@ func (s *Session) connectServer(ctx context.Context, rpHandler *resourcepacks.Re
 
 	logrus.Info(locale.Loc("connecting", locale.Strmap{"Address": address}))
 
-	isNetherNet := strings.HasPrefix(address, "nethernet:")
-	if isNetherNet {
-		service, err := s.connectInfo.Account.Signaling(s.ctx)
-		if err != nil {
-			return err
-		}
-		mcToken, err := s.connectInfo.Account.MCToken(ctx)
-		if err != nil {
-			return err
-		}
-		signals, err := signaling.Dialer{
-			Service: service,
-		}.DialContext(ctx, mcToken)
-		if err != nil {
-			return fmt.Errorf("error dialing signaling: %s", err)
-		}
-		minecraft.RegisterNetwork("nethernet", func(l *slog.Logger) minecraft.Network {
-			return NetherNet{
-				Signaling: signals,
-			}
-		})
+	xblClient, err := s.connectInfo.Account.XBLClient(ctx)
+	if err != nil {
+		return err
 	}
 
+	playfabClient, err := s.connectInfo.Account.PlayFabClient(ctx)
+	if err != nil {
+		return err
+	}
+
+	var clientNonce string
 	dialer := minecraft.Dialer{
-		AuthSource:                 s.connectInfo.Account,
+		TokenSource:   s.connectInfo.Account,
+		XBLClient:     xblClient,
+		PlayFabClient: playfabClient,
+
 		DisconnectOnUnknownPackets: false,
 		ErrorLog:                   slog.Default(),
 		PacketFunc:                 s.packetFunc,
@@ -414,7 +421,9 @@ func (s *Session) connectServer(ctx context.Context, rpHandler *resourcepacks.Re
 				case <-ctx.Done():
 				}
 			}
-			return s.clientData
+			clientData := s.clientData
+			clientData.Nonce = clientNonce
+			return clientData
 		},
 		EarlyConnHandler: func(conn *minecraft.Conn) {
 			s.Server = conn
@@ -424,17 +433,55 @@ func (s *Session) connectServer(ctx context.Context, rpHandler *resourcepacks.Re
 		},
 	}
 
+	var dialErr error
+	isNetherNet := strings.HasPrefix(address, "nethernet:")
 	if isNetherNet {
-		_, err = dialer.DialContext(ctx, "nethernet", address)
-	} else {
-		_, err = dialer.DialContext(ctx, "raknet", address)
-	}
+		id, err := uuid.Parse(strings.Split(address, ":")[1])
+		if err != nil {
+			return fmt.Errorf("parsing nethernet address: %s", err)
+		}
 
-	if err != nil {
+		p2pClient := p2p.NewClient(xblClient)
+		session, err := p2pClient.Join(ctx, id)
+		if err != nil {
+			return fmt.Errorf("joining session: %s", err)
+		}
+		s.p2pSession = session
+		clientNonce = session.Nonce()
+
+		tokenSource, err := s.connectInfo.Account.TokenSource(ctx)
+		if err != nil {
+			return fmt.Errorf("creating TokenSource: %s", err)
+		}
+
+		var signalingConn interface {
+			nethernet.Signaling
+			io.Closer
+		}
+		switch session.Connection().Type {
+		case p2p.ConnectionTypeSignalingOverJSONRPC:
+			var d messaging.Dialer
+			signalingConn, err = d.DialContext(ctx, tokenSource)
+		case p2p.ConnectionTypeSignalingOverWebSocket:
+			var d signaling.Dialer
+			signalingConn, err = d.DialContext(ctx, tokenSource)
+		default:
+			return fmt.Errorf("unimplemented signaling type %d", session.Connection().Type)
+		}
+		if err != nil {
+			return fmt.Errorf("error dialing messaging conn: %s", err)
+		}
+		s.signaling = signalingConn
+
+		_, dialErr = dialer.DialContextNetwork(ctx, minecraft.NetherNet{Signaling: signalingConn}, session.Connection().Address())
+	} else {
+		_, dialErr = dialer.DialContext(ctx, "raknet", address)
+	}
+	if dialErr != nil {
 		if s.expectDisconnect {
 			return nil
 		}
-		return err
+		return dialErr
 	}
 
 	messages.SendEvent(&messages.EventConnectStateUpdate{

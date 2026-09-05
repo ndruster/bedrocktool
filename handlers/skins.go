@@ -215,9 +215,6 @@ func (s *SkinSaver) ProcessPacket(pk packet.Packet) (out []SkinAdd) {
 		}
 
 	case *packet.PlayerList:
-		if pk.ActionType == packet.PlayerListActionRemove { // remove
-			return nil
-		}
 		for _, playerEntry := range pk.Entries {
 			player := s.AddOrGetPlayer(playerEntry.UUID, playerEntry.Username)
 			skin, wasAdded := s.AddSkin(player, &playerEntry.Skin)

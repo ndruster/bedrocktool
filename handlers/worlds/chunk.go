@@ -26,13 +26,15 @@ func (w *worldsHandler) handleLevelChunk(pk *packet.LevelChunk, timeReceived tim
 		return errors.New("cache is supposed to be handled in proxy")
 	}
 
-	var subChunkCount int
-	switch pk.SubChunkCount {
-	case protocol.SubChunkRequestModeLimited, protocol.SubChunkRequestModeLimitless:
-		subChunkCount = 0
-	default:
-		subChunkCount = int(pk.SubChunkCount)
-	}
+	/*
+		var subChunkCount int
+		switch pk.SubChunkCount {
+		case protocol.SubChunkRequestModeLimited, protocol.SubChunkRequestModeLimitless:
+			subChunkCount = 0
+		default:
+			subChunkCount = int(pk.SubChunkCount)
+		}
+	*/
 
 	w.worldStateMu.Lock()
 	defer w.worldStateMu.Unlock()
@@ -41,7 +43,7 @@ func (w *worldsHandler) handleLevelChunk(pk *packet.LevelChunk, timeReceived tim
 
 	levelChunk, blockNBTs, err := chunk.NetworkDecode(
 		w.serverState.blocks,
-		pk.RawPayload, subChunkCount,
+		pk.RawPayload, int(pk.SubChunkCount),
 		w.worldState.Range(),
 		w.serverState.useHashedRids,
 	)
@@ -75,12 +77,12 @@ func (w *worldsHandler) handleLevelChunk(pk *packet.LevelChunk, timeReceived tim
 	w.worldState.IgnoredChunks[pos] = false
 
 	// request subchunks
-	max := w.worldState.Dimension().Range().Height() / 16
-	switch pk.SubChunkCount {
-	case protocol.SubChunkRequestModeLimited:
-		max = int(pk.HighestSubChunk)
-		fallthrough
-	case protocol.SubChunkRequestModeLimitless:
+	if subChunkLimit, ok := pk.SubChunkLimit.Value(); ok {
+		max := w.worldState.Dimension().Range().Height() / 16
+		if subChunkLimit != -1 {
+			max = int(subChunkLimit)
+		}
+
 		var offsetTable []protocol.SubChunkOffset
 		r := w.worldState.Dimension().Range()
 		for y := int8(r.Min() / 16); y < int8(r.Max()/16)+1; y++ {
@@ -95,7 +97,6 @@ func (w *worldsHandler) handleLevelChunk(pk *packet.LevelChunk, timeReceived tim
 			},
 			Offsets: offsetTable[:min(max+1, len(offsetTable))],
 		})
-	default:
 	}
 
 	err = w.worldState.StoreChunk(pos, ch)
@@ -165,7 +166,11 @@ func (w *worldsHandler) processSubChunk(pk *packet.SubChunk) error {
 		switch ent.Result {
 		case protocol.SubChunkResultSuccessAllAir:
 		case protocol.SubChunkResultSuccess:
-			buf := bytes.NewBuffer(ent.RawPayload)
+			payload, ok := ent.RawPayload.Value()
+			if !ok {
+				continue
+			}
+			buf := bytes.NewBuffer(payload)
 			index := uint8(absY)
 			sub, err := chunk.DecodeSubChunk(
 				buf,

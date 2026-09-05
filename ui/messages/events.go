@@ -4,6 +4,7 @@ import (
 	"image"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sirupsen/logrus"
 )
@@ -145,15 +146,17 @@ func SendEvent(event any) {
 
 type AuthHandler struct{}
 
-func (a *AuthHandler) AuthCode(uri, code string) {
+var _ auth.AuthCodeHandler = (*AuthHandler)(nil)
+
+// DisplayCode implements [auth.AuthCodeHandler].
+func (a *AuthHandler) DisplayCode(VerificationURI string, UserCode string) {
 	SendEvent(&EventDisplayAuthCode{
-		URI:      uri,
-		AuthCode: code,
+		URI:      VerificationURI,
+		AuthCode: UserCode,
 	})
 }
 
-func (a *AuthHandler) Finished(err error) {
-	SendEvent(&EventAuthFinished{
-		Error: err,
-	})
+// Successful implements [auth.AuthCodeHandler].
+func (a *AuthHandler) Successful() {
+	SendEvent(&EventAuthFinished{})
 }

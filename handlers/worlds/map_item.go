@@ -135,12 +135,11 @@ func (m *MapUI) mapUpdater(ctx context.Context) {
 			m.redraw()
 
 			if err := m.w.session.ClientWritePacket(&packet.ClientBoundMapItemData{
-				MapID:       ViewMapID,
-				Scale:       4,
-				Width:       128,
-				Height:      128,
-				Pixels:      utils.Img2rgba(m.mapImage),
-				UpdateFlags: packet.MapUpdateFlagTexture,
+				MapID:  ViewMapID,
+				Scale:  protocol.Option(uint8(4)),
+				Width:  protocol.Option(int32(128)),
+				Height: protocol.Option(int32(128)),
+				Pixels: protocol.Option(utils.Img2rgba(m.mapImage)),
 			}); err != nil {
 				if errors.Is(err, net.ErrClosed) {
 					return
@@ -185,9 +184,8 @@ func (m *MapUI) Start(ctx context.Context) {
 	// init map
 	err := m.w.session.ClientWritePacket(&packet.ClientBoundMapItemData{
 		MapID:          ViewMapID,
-		Scale:          4,
-		MapsIncludedIn: []int64{ViewMapID},
-		UpdateFlags:    packet.MapUpdateFlagInitialisation,
+		Scale:          protocol.Option(uint8(4)),
+		MapsIncludedIn: protocol.Option([]int64{ViewMapID}),
 	})
 	if err != nil {
 		m.log.Error(err)

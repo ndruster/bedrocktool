@@ -3,7 +3,6 @@ package settings
 import (
 	"gioui.org/layout"
 	"gioui.org/op"
-	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 	"gioui.org/x/component"
@@ -12,6 +11,7 @@ import (
 	"github.com/bedrock-tool/bedrocktool/utils/auth"
 	"github.com/bedrock-tool/bedrocktool/utils/connectinfo"
 	"github.com/bedrock-tool/bedrocktool/utils/franchise/gatherings"
+	"github.com/sandertv/gophertunnel/minecraft/p2p"
 	"github.com/sandertv/gophertunnel/minecraft/realms"
 )
 
@@ -21,6 +21,7 @@ type addressInput struct {
 	showRealmsList widget.Clickable
 	showGatherings widget.Clickable
 	showFeatured   widget.Clickable
+	showWorlds     widget.Clickable
 
 	connectInfo *connectinfo.ConnectInfo
 }
@@ -69,6 +70,13 @@ func (a *addressInput) Layout(gtx C, th *material.Theme) D {
 		}))
 	}
 
+	if a.showWorlds.Clicked(gtx) {
+		a.g.ShowPopup(popups.NewWorldsList(a.g, func(world *p2p.World) {
+			a.connectInfo.SetWorld(world)
+			a.editor.SetText(a.connectInfo.Value)
+		}))
+	}
+
 	return layout.UniformInset(5).Layout(gtx, func(gtx C) D {
 		return layout.Flex{
 			Axis: layout.Vertical,
@@ -90,10 +98,10 @@ func (a *addressInput) Layout(gtx C, th *material.Theme) D {
 				return d
 			}),
 			layout.Rigid(func(gtx C) D {
-				gtx.Constraints.Max.X = gtx.Dp(unit.Dp(300))
+				//gtx.Constraints.Max.X = gtx.Dp(unit.Dp(500))
 				return layout.Flex{
 					Axis:      layout.Horizontal,
-					WeightSum: 3,
+					WeightSum: 4,
 				}.Layout(gtx,
 					layout.Flexed(1, func(gtx C) D {
 						return layout.Inset{
@@ -118,6 +126,14 @@ func (a *addressInput) Layout(gtx C, th *material.Theme) D {
 							Left:   0,
 							Right:  5,
 						}.Layout(gtx, material.Button(th, &a.showFeatured, "Featured").Layout)
+					}),
+					layout.Flexed(1, func(gtx C) D {
+						return layout.Inset{
+							Top:    5,
+							Bottom: 5,
+							Left:   0,
+							Right:  5,
+						}.Layout(gtx, material.Button(th, &a.showWorlds, "Worlds").Layout)
 					}),
 				)
 			}),

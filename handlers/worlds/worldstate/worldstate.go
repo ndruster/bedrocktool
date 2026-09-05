@@ -1,11 +1,7 @@
 package worldstate
 
 import (
-	"image"
-	"image/draw"
-
 	"github.com/bedrock-tool/bedrocktool/handlers/worlds/entity"
-	"github.com/bedrock-tool/bedrocktool/utils"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
@@ -43,31 +39,7 @@ func (w *memoryState) StoreChunk(pos world.ChunkPos, ch *Chunk) {
 }
 
 func (w *memoryState) StoreMap(m *packet.ClientBoundMapItemData) {
-	return // not finished yet
-	m1, ok := w.maps[m.MapID]
-	if !ok {
-		m1 = &Map{
-			MapID:     m.MapID,
-			Height:    128,
-			Width:     128,
-			Scale:     1,
-			Dimension: 0,
-			ZCenter:   m.Origin.Z(),
-			XCenter:   m.Origin.X(),
-		}
-		w.maps[m.MapID] = m1
-	}
-	draw.Draw(&image.RGBA{
-		Pix:    m1.Colors[:],
-		Rect:   image.Rect(0, 0, int(m.Width), int(m.Height)),
-		Stride: int(m.Width) * 4,
-	}, image.Rect(
-		int(m.XOffset), int(m.YOffset),
-		int(m.Width), int(m.Height),
-	), utils.RGBA2Img(m.Pixels, int(m.Width), int(m.Height)),
-		image.Point{},
-		draw.Over,
-	)
+	return
 }
 
 func cubePosInChunk(pos cube.Pos) (p world.ChunkPos, sp int16) {

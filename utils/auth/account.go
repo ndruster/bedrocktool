@@ -2,27 +2,19 @@ package auth
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
-	"github.com/bedrock-tool/bedrocktool/utils/auth/xbox"
-	"github.com/bedrock-tool/bedrocktool/utils/franchise/authservice"
-	"github.com/bedrock-tool/bedrocktool/utils/franchise/discovery"
 	"github.com/bedrock-tool/bedrocktool/utils/franchise/gatherings"
-	"github.com/bedrock-tool/bedrocktool/utils/franchise/signaling"
-	"github.com/df-mc/go-xsapi"
-	"github.com/sandertv/gophertunnel/minecraft/auth"
+	"github.com/df-mc/go-playfab/v2"
+	"github.com/df-mc/go-xsapi/v2"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/realms"
+	"github.com/sandertv/gophertunnel/minecraft/service"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
@@ -31,87 +23,45 @@ type Account struct {
 	name       string
 	env        string
 	token      *tokenInfo
-	discovery  *discovery.Discovery
-	realms     *realms.Client
-	gatherings *gatherings.GatheringsService
-	signaling  *signaling.SignalingService
+	playfab    atomic.Pointer[playfab.Client]
+	xblClient  atomic.Pointer[xsapi.Client]
+	mcToken    atomic.Pointer[service.Token]
+	realms     atomic.Pointer[realms.Client]
+	gatherings atomic.Pointer[gatherings.Service]
 }
 
-type liveTokenSource struct {
-	account *Account
+func (account *Account) Name() string {
+	return account.name
 }
 
-func (a liveTokenSource) Token() (t *oauth2.Token, err error) {
-	return a.account.LiveToken(context.Background())
-}
-
-type xsapiTokenSource struct {
-	account *Account
-}
-
-var _ xsapi.TokenSource = xsapiTokenSource{}
-
-type xsapiToken struct {
-	*auth.XBLToken
-}
-
-func (x xsapiToken) DisplayClaims() xsapi.DisplayClaims {
-	return xsapi.DisplayClaims{
-		GamerTag: x.XBLToken.AuthorizationToken.DisplayClaims.UserInfo[0].GamerTag,
-		XUID:     x.XBLToken.AuthorizationToken.DisplayClaims.UserInfo[0].XUID,
-		UserHash: x.XBLToken.AuthorizationToken.DisplayClaims.UserInfo[0].UserHash,
-	}
-}
-
-func (x xsapiToken) String() string {
-	return x.AuthorizationToken.Token
-}
-
-func (x xsapiTokenSource) Token() (xsapi.Token, error) {
-	token, err := x.account.XBLToken(context.Background(), "https://multiplayer.minecraft.net/")
-	if err != nil {
-		return nil, err
-	}
-	return xsapiToken{token}, nil
-}
-
-func (a *Account) Name() string {
-	return a.name
-}
-
-func (a *Account) LiveToken(ctx context.Context) (t *oauth2.Token, err error) {
-	if a.token == nil {
+func (account *Account) LiveToken(ctx context.Context) (t *oauth2.Token, err error) {
+	if account.token == nil {
 		return nil, ErrNotLoggedIn
 	}
-	if !a.token.LiveToken().Valid() {
+	liveToken := account.token.LiveToken()
+	if !liveToken.Valid() {
 		logrus.WithField("part", "Auth").Info("Refreshing Microsoft Token")
-		liveToken, err := xbox.RefreshToken(a.token.LiveToken(), a.token.XboxDeviceType())
+		conf := account.token.AuthConfig()
+		if conf == nil {
+			return nil, fmt.Errorf("invalid token")
+		}
+		liveToken, err := conf.RefreshTokenSource(liveToken).Token()
 		if err != nil {
 			return nil, err
 		}
-		a.token.Token = liveToken
-		if err = writeAuth(tokenFileName(a.name), *a.token); err != nil {
+		account.token.Token = liveToken
+		if err = writeAuth(tokenFileName(account.name), *account.token); err != nil {
 			return nil, err
 		}
 	}
-	return a.token.LiveToken(), nil
+	return account.token.LiveToken(), nil
 }
 
-func (a *Account) Discovery(ctx context.Context) (d *discovery.Discovery, err error) {
-	if a.discovery == nil {
-		a.discovery, err = discovery.GetDiscovery(ctx, a.env)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return a.discovery, nil
-}
-
-func (a *Account) checkMCToken() bool {
-	if a.token.MCToken.ValidUntil.Before(time.Now()) {
+func checkMCToken(mcToken *service.Token) bool {
+	if mcToken.ValidUntil.Before(time.Now()) {
 		return false
 	}
-	data, err := base64.RawURLEncoding.DecodeString(strings.Split(a.token.MCToken.AuthorizationHeader, ".")[1])
+	data, err := base64.RawURLEncoding.DecodeString(strings.Split(mcToken.AuthorizationHeader, ".")[1])
 	if err != nil {
 		logrus.Error("invalid mctoken, refreshing")
 		return false
@@ -129,103 +79,81 @@ func (a *Account) checkMCToken() bool {
 	return true
 }
 
-func (a *Account) MCToken(ctx context.Context) (*authservice.MCToken, error) {
-	if a.token.MCToken != nil {
-		if !a.checkMCToken() {
-			a.token.MCToken = nil
-		}
-	}
-	if a.token.MCToken == nil {
-		discovery, err := a.Discovery(ctx)
-		if err != nil {
-			return nil, err
-		}
-		authService, err := authservice.NewAuthService(discovery)
-		if err != nil {
-			return nil, err
-		}
-		pfXblToken, err := a.XBLToken(ctx, "rp://playfabapi.com/")
-		if err != nil {
-			return nil, err
-		}
-
-		res, err := authService.StartSession(ctx, pfXblToken.Token(), authService.Config.PlayfabTitleID)
-		if err != nil {
-			return nil, err
-		}
-		a.token.MCToken = res
-		if err = writeAuth(tokenFileName(a.name), *a.token); err != nil {
-			return nil, err
-		}
-	}
-	return a.token.MCToken, nil
-}
-
-func (a *Account) Gatherings(ctx context.Context) (*gatherings.GatheringsService, error) {
-	if a.gatherings == nil {
-		discovery, err := a.Discovery(ctx)
-		if err != nil {
-			return nil, err
-		}
-		gatheringsService, err := gatherings.NewGatheringsService(discovery)
-		if err != nil {
-			return nil, err
-		}
-		a.gatherings = gatheringsService
-	}
-	return a.gatherings, nil
-}
-
-func (a *Account) Signaling(ctx context.Context) (*signaling.SignalingService, error) {
-	if a.gatherings == nil {
-		discovery, err := a.Discovery(ctx)
-		if err != nil {
-			return nil, err
-		}
-		signalingService, err := signaling.NewSignalingService(discovery)
-		if err != nil {
-			return nil, err
-		}
-		a.signaling = signalingService
-	}
-	return a.signaling, nil
-}
-
-func (a *Account) Realms() *realms.Client {
-	if a.realms == nil {
-		a.realms = realms.NewClient(liveTokenSource{account: a}, nil, "")
-	}
-	return a.realms
-}
-
-func (a *Account) Chain(ctx context.Context) (ChainKey *ecdsa.PrivateKey, ChainData string, err error) {
-	ch, err := readAuth[chain](chainFileName(a.name))
-	if errors.Is(err, os.ErrNotExist) {
-		err = nil
-	}
+func (account *Account) AuthService(ctx context.Context) (*service.AuthorizationEnvironment, error) {
+	discovery, err := service.Default(ctx)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
-	if ch != nil && ch.DeviceType != a.token.DeviceType {
-		ch = nil
+	var authService service.AuthorizationEnvironment
+	err = discovery.Environment(&authService)
+	if err != nil {
+		return nil, err
 	}
-	if ch == nil || ch.Expired() {
-		ChainKey, ChainData, err := a.authChain(ctx)
-		if err != nil {
-			return nil, "", err
-		}
-		ch = &chain{
-			ChainKey:   ChainKey,
-			ChainData:  ChainData,
-			DeviceType: a.token.DeviceType,
-		}
-		if err = writeAuth(chainFileName(a.name), ch); err != nil {
-			return nil, "", err
-		}
-	}
-	return ch.ChainKey, ch.ChainData, nil
+	return &authService, nil
 }
 
+func (account *Account) MCToken(ctx context.Context) (*service.Token, error) {
+	if mcToken := account.mcToken.Load(); mcToken != nil && checkMCToken(mcToken) {
+		return mcToken, nil
+	}
+	authService, err := account.AuthService(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	playfabClient, err := account.PlayFabClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sessionTicket, err := playfabClient.SessionTicket(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	mcToken, err := authService.Token(ctx, service.TokenConfig{
+		User: service.UserConfig{
+			TokenType: "PlayFab",
+			Token:     sessionTicket,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	account.mcToken.Store(mcToken)
+	return mcToken, nil
+}
+
+func (account *Account) Gatherings(ctx context.Context) (*gatherings.Service, error) {
+	if gatheringsService := account.gatherings.Load(); gatheringsService != nil {
+		return gatheringsService, nil
+	}
+	discovery, err := service.Default(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var gatheringsService gatherings.Service
+	err = discovery.Environment(&gatheringsService)
+	if err != nil {
+		return nil, err
+	}
+	account.gatherings.Store(&gatheringsService)
+	return &gatheringsService, nil
+}
+
+func (account *Account) Realms(ctx context.Context) (*realms.Client, error) {
+	if realmsClient := account.realms.Load(); realmsClient != nil {
+		return realmsClient, nil
+	}
+	t, err := account.LiveToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+	realmsClient := realms.NewClient(oauth2.StaticTokenSource(t), nil, "")
+	account.realms.Store(realmsClient)
+	return realmsClient, nil
+}
+
+/*
 func (a *Account) MultiplayerSessionToken(ctx context.Context, publicKey *ecdsa.PublicKey) (string, error) {
 	discovery, err := a.Discovery(ctx)
 	if err != nil {
@@ -244,30 +172,64 @@ func (a *Account) MultiplayerSessionToken(ctx context.Context, publicKey *ecdsa.
 	signedToken, _, err := authService.MultiplayerSessionStart(ctx, keyData, mcToken)
 	return signedToken, err
 }
+*/
 
-func (a *Account) XBLToken(ctx context.Context, relyingParty string) (*auth.XBLToken, error) {
-	liveToken, err := a.LiveToken(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("request Live Connect token: %w", err)
-	}
-	xsts, err := xbox.RequestXBLToken(ctx, liveToken, relyingParty, a.token.XboxDeviceType())
-	if err != nil {
-		return nil, fmt.Errorf("request XBOX Live token: %w", err)
-	}
-	return &auth.XBLToken{
-		AuthorizationToken: xsts.AuthorizationToken,
-	}, nil
+var _ oauth2.TokenSource = (*Account)(nil)
+
+// Token implements [oauth2.TokenSource].
+func (account *Account) Token() (*oauth2.Token, error) {
+	return account.LiveToken(context.Background())
 }
 
-func (a *Account) authChain(ctx context.Context) (key *ecdsa.PrivateKey, chain string, err error) {
-	key, _ = ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-	xstsa, err := a.XBLToken(ctx, "https://multiplayer.minecraft.net/")
-	if err != nil {
-		return nil, "", err
+func (account *Account) XBLClient(ctx context.Context) (*xsapi.Client, error) {
+	if xblClient := account.xblClient.Load(); xblClient != nil {
+		return xblClient, nil
 	}
-	chain, err = auth.RequestMinecraftChain(ctx, xstsa, key)
+	xblClient, err := xsapi.ClientConfig{}.New(ctx, defaultDeviceType.New(account, nil))
 	if err != nil {
-		return nil, "", fmt.Errorf("request Minecraft auth chain: %w", err)
+		return nil, err
 	}
-	return key, chain, nil
+	account.xblClient.Store(xblClient)
+	return xblClient, nil
+}
+
+func (account *Account) PlayFabClient(ctx context.Context) (*playfab.Client, error) {
+	xblClient, err := account.XBLClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	playfabClient, err := playfab.LoginWithXbox(ctx, "20CA2", xblClient, playfab.ClientConfig{
+		CreateAccount: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	account.playfab.Store(playfabClient)
+	return playfabClient, nil
+}
+
+func (account *Account) TokenSource(ctx context.Context) (service.TokenSource, error) {
+	authService, err := account.AuthService(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	playfabClient, err := account.PlayFabClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tokenSource := authService.TokenSource(playfabClient, service.TokenConfig{})
+	return tokenSource, nil
+}
+
+// maybe add MultiplayerTokenSource
+
+func (account *Account) Close() error {
+	if xblClient := account.xblClient.Swap(nil); xblClient != nil {
+		_ = xblClient.Close()
+	}
+	if playfabClient := account.playfab.Swap(nil); playfabClient != nil {
+		_ = playfabClient.Close()
+	}
+	return nil
 }

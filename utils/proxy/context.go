@@ -10,7 +10,6 @@ import (
 
 	"github.com/bedrock-tool/bedrocktool/ui/messages"
 	"github.com/bedrock-tool/bedrocktool/utils/auth"
-	"github.com/bedrock-tool/bedrocktool/utils/auth/xbox"
 	"github.com/bedrock-tool/bedrocktool/utils/connectinfo"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/resource"
@@ -92,7 +91,7 @@ func (p *Context) Run(ctx context.Context, withClient bool) (err error) {
 
 	if !p.settings.ConnectInfo.IsReplay() && p.settings.ConnectInfo.Account == nil {
 		if !auth.Auth.LoggedIn() {
-			err := auth.Auth.Login(ctx, &xbox.DeviceTypeAndroid, "")
+			err := auth.Auth.Login(ctx, nil, "")
 			if err != nil {
 				return err
 			}
@@ -100,7 +99,7 @@ func (p *Context) Run(ctx context.Context, withClient bool) (err error) {
 		p.settings.ConnectInfo.Account = auth.Auth.Account()
 	}
 
-	if p.settings.Capture {
+	if p.settings.Capture && !p.settings.ConnectInfo.IsReplay() {
 		p.AddHandler(NewPacketCapturer)
 	}
 	p.addedPacks, err = loadForcedPacks()

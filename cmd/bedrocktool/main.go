@@ -16,7 +16,6 @@ import (
 	"github.com/bedrock-tool/bedrocktool/ui/cli"
 	"github.com/bedrock-tool/bedrocktool/utils"
 	"github.com/bedrock-tool/bedrocktool/utils/auth"
-	"github.com/bedrock-tool/bedrocktool/utils/auth/xbox"
 	"github.com/bedrock-tool/bedrocktool/utils/commands"
 	"github.com/bedrock-tool/bedrocktool/utils/osabs"
 
@@ -156,7 +155,7 @@ func (TransCMD) Run(ctx context.Context, settings any) error {
 		if auth.Auth.LoggedIn() {
 			logrus.Info("Already Logged in")
 		} else {
-			auth.Auth.Login(ctx, &xbox.DeviceTypeAndroid, "")
+			auth.Auth.Login(ctx, nil, "")
 		}
 	}
 	fmt.Println(BlackFg + Bold + Blue + " Trans " + Pink + " Rights " + White + " Are " + Pink + " Human " + Blue + " Rights " + Reset)

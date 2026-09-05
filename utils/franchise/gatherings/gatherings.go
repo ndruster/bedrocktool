@@ -2,16 +2,17 @@ package gatherings
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
-	"github.com/bedrock-tool/bedrocktool/utils/franchise/authservice"
-	"github.com/bedrock-tool/bedrocktool/utils/franchise/discovery"
 	"github.com/bedrock-tool/bedrocktool/utils/franchise/internal"
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/service"
 )
 
 type Segment struct {
@@ -38,7 +39,7 @@ type Segment struct {
 }
 
 type Gathering struct {
-	client *GatheringsService
+	service *Service
 
 	GatheringID   string         `json:"gatheringId"`
 	StartTimeUtc  time.Time      `json:"startTimeUtc"`
@@ -52,28 +53,30 @@ type Gathering struct {
 	AdditionalLoc map[string]any `json:"additionalLoc"`
 }
 
-func (g *Gathering) Address(ctx context.Context, mcToken *authservice.MCToken) (string, error) {
+func (g *Gathering) Address(ctx context.Context, mcToken *service.Token) (string, error) {
 	type Venue struct {
 		Venue struct {
 			ServerIpAddress string `json:"serverIpAddress"`
 			ServerPort      int    `json:"serverPort"`
 		} `json:"venue"`
 	}
-
-	resp1, err := internal.DoRequest[any](
-		ctx, http.DefaultClient, "GET",
-		g.client.Config.Url("/api/v1.0/access?lang=en-US&clientVersion=%s&clientPlatform=Windows10&clientSubPlatform=Windows10", protocol.CurrentVersion),
-		nil, mcToken.AddHeader,
-	)
+	accessUrl := g.service.ServiceURI.JoinPath("/api/v1.0/access")
+	accessUrl.RawQuery = url.Values{
+		"lang":              []string{"en-US"},
+		"clientVersion":     []string{protocol.CurrentVersion},
+		"clientPlatform":    []string{"Windows10"},
+		"clientSubPlatform": []string{"Windows10"},
+	}.Encode()
+	accessResp, err := internal.DoRequest[any](ctx, http.DefaultClient, "GET", accessUrl.String(), nil, mcToken.SetAuthHeader)
 	if err != nil {
 		return "", err
 	}
-	_ = resp1
+	_ = accessResp
 
 	resp, err := internal.DoRequest[internal.Result[Venue]](
 		ctx, http.DefaultClient, "GET",
-		g.client.Config.Url("/api/v1.0/venue/%s", g.GatheringID),
-		nil, mcToken.AddHeader,
+		g.service.ServiceURI.JoinPath("/api/v1.0/venue/", g.GatheringID).String(),
+		nil, mcToken.SetAuthHeader,
 	)
 	if err != nil {
 		return "", err
@@ -86,38 +89,60 @@ func (g *Gathering) Address(ctx context.Context, mcToken *authservice.MCToken) (
 	return fmt.Sprintf("%s:%d", resp.Data.Venue.ServerIpAddress, resp.Data.Venue.ServerPort), nil
 }
 
-type GatheringsService struct {
-	Config discovery.Service
+type Service struct {
+	ServiceURI *url.URL `json:"serviceUri"`
 }
 
-func NewGatheringsService(discovery *discovery.Discovery) (*GatheringsService, error) {
-	g := &GatheringsService{}
-	err := discovery.Environment(&g.Config, "gatherings")
-	if err != nil {
-		return nil, err
+func (a *Service) ServiceName() string {
+	return "gatherings"
+}
+
+func (e *Service) UnmarshalJSON(b []byte) error {
+	type Alias Service
+	data := struct {
+		*Alias
+		ServiceURI string `json:"serviceUri"`
+	}{
+		Alias: (*Alias)(e),
 	}
-	return g, nil
+	if err := json.Unmarshal(b, &data); err != nil {
+		return err
+	}
+	// [url.Parse] accepts empty strings and returns a valid url.URL with no error,
+	// so we must explicitly validate that ServiceURI and Issuer are not empty.
+	if data.ServiceURI == "" {
+		return errors.New("service: Service.ServiceURI cannot be empty string")
+	}
+	var err error
+	e.ServiceURI, err = url.Parse(data.ServiceURI)
+	if err != nil {
+		return fmt.Errorf("parse ServiceURI: %w", err)
+	}
+	return nil
 }
 
-func (g *GatheringsService) GetGatherings(ctx context.Context, mcToken *authservice.MCToken) ([]*Gathering, error) {
-	resp, err := internal.DoRequest[internal.Result[[]Gathering]](
-		ctx, http.DefaultClient, "GET",
-		g.Config.Url("/api/v1.0/config/public?lang=en-GB&clientVersion=%s&clientPlatform=Windows10&clientSubPlatform=Windows10", protocol.CurrentVersion),
-		nil, mcToken.AddHeader,
-	)
+func (g *Service) GetGatherings(ctx context.Context, mcToken *service.Token) ([]*Gathering, error) {
+	var configUrl = g.ServiceURI.JoinPath("/api/v1.0/config/public")
+	configUrl.RawQuery = url.Values{
+		"lang":              []string{"en-US"},
+		"clientVersion":     []string{protocol.CurrentVersion},
+		"clientPlatform":    []string{"Windows10"},
+		"clientSubPlatform": []string{"Windows10"},
+	}.Encode()
+	configResp, err := internal.DoRequest[internal.Result[[]Gathering]](ctx, http.DefaultClient, "GET", configUrl.String(), nil, mcToken.SetAuthHeader)
 	if err != nil {
 		return nil, err
 	}
 
 	var gatherings []*Gathering
-	for _, gathering := range resp.Data {
-		gathering.client = g
+	for _, gathering := range configResp.Data {
+		gathering.service = g
 		gatherings = append(gatherings, &gathering)
 	}
 	return gatherings, nil
 }
 
-func (g *GatheringsService) JoinExperience(ctx context.Context, mcToken *authservice.MCToken, id uuid.UUID) (string, error) {
+func (g *Service) JoinExperience(ctx context.Context, mcToken *service.Token, id uuid.UUID) (string, error) {
 	type Join struct {
 		NetworkProtocol string `json:"networkProtocol"`
 		IPV4Address     string `json:"ipV4Address"`
@@ -125,9 +150,9 @@ func (g *GatheringsService) JoinExperience(ctx context.Context, mcToken *authser
 	}
 	resp, err := internal.DoRequest[internal.Result[Join]](
 		ctx, http.DefaultClient, "POST",
-		g.Config.Url("/api/v2.0/join/experience"),
+		g.ServiceURI.JoinPath("/api/v2.0/join/experience").String(),
 		map[string]any{"experienceId": id},
-		mcToken.AddHeader,
+		mcToken.SetAuthHeader,
 	)
 	if err != nil {
 		return "", err
@@ -141,7 +166,7 @@ type FeaturedServer struct {
 	ExperienceId string
 }
 
-func (g *GatheringsService) GetFeaturedServers(ctx context.Context, mcToken *authservice.MCToken) ([]FeaturedServer, error) {
+func (g *Service) GetFeaturedServers(ctx context.Context, mcToken *service.Token) ([]FeaturedServer, error) {
 	type Translated struct {
 		Neutral string `json:"NEUTRAL"`
 	}
@@ -209,8 +234,8 @@ func (g *GatheringsService) GetFeaturedServers(ctx context.Context, mcToken *aut
 
 	resp, err := internal.DoRequest[internal.Data[Data]](
 		ctx, http.DefaultClient, "POST",
-		g.Config.Url("/api/v2.0/discovery/blob/client"),
-		nil, mcToken.AddHeader)
+		g.ServiceURI.JoinPath("/api/v2.0/discovery/blob/client").String(),
+		nil, mcToken.SetAuthHeader)
 	if err != nil {
 		return nil, err
 	}

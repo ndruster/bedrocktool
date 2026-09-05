@@ -1,6 +1,6 @@
 module github.com/bedrock-tool/bedrocktool
 
-go 1.25
+go 1.25.0
 
 // that repo has a bad go.mod so need to force the old version
 replace github.com/brentp/intintmap => github.com/brentp/intintmap v0.0.0-20190211203843-30dc0ade9af9
@@ -12,7 +12,7 @@ require (
 	github.com/OneOfOne/xxhash v1.2.8
 	github.com/chzyer/readline v1.5.1
 	github.com/cloudfoundry/jibber_jabber v0.0.0-20151120183258-bcc4c8345a21
-	github.com/coder/websocket v1.8.14
+	github.com/coder/websocket v1.8.15
 	github.com/dblezek/tga v0.0.0-20150626111426-80720cbc1017
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/df-mc/dragonfly v0.10.9
@@ -24,7 +24,7 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/gioui-plugins/gio-plugins v0.8.0
 	github.com/go-gl/mathgl v1.2.0
-	github.com/go-jose/go-jose/v4 v4.1.3
+	github.com/go-jose/go-jose/v4 v4.1.5
 	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.18.2
 	github.com/minio/selfupdate v0.6.0
@@ -37,9 +37,9 @@ require (
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	golang.org/x/exp v0.0.0-20251209150349-8475f28825e9
 	golang.org/x/exp/shiny v0.0.0-20251209150349-8475f28825e9
-	golang.org/x/oauth2 v0.34.0
+	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sys v0.39.0
-	golang.org/x/text v0.32.0
+	golang.org/x/text v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -47,6 +47,7 @@ require (
 	aead.dev/minisign v0.3.0 // indirect
 	gioui.org/shader v1.0.8 // indirect
 	github.com/brentp/intintmap v0.0.0-20251106190759-56907b1f8479 // indirect
+	github.com/df-mc/go-xsapi/v2 v2.0.3 // indirect
 	github.com/df-mc/jsonc v1.0.5 // indirect
 	github.com/df-mc/worldupgrader v1.0.20 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect

@@ -195,10 +195,8 @@ func (w *worldsHandler) packetHandlerIngame(_pk packet.Packet, toServer bool, ti
 		})
 
 	case *packet.PlayerList:
-		if pk.ActionType == packet.PlayerListActionAdd {
-			for _, player := range pk.Entries {
-				w.serverState.playerSkins[player.UUID] = &player.Skin
-			}
+		for _, player := range pk.Entries {
+			w.serverState.playerSkins[player.UUID] = &player.Skin
 		}
 
 	case *packet.PlayerSkin:
@@ -403,20 +401,24 @@ func (w *worldsHandler) packetHandlerIngame(_pk packet.Packet, toServer bool, ti
 		w.currentWorld(func(world *worldstate.World) {
 			world.ActEntity(pk.EntityRuntimeID, false, func(ent *entity.Entity) error {
 				prevPosition := ent.Position
-				if pk.Flags&packet.MoveActorDeltaFlagHasX != 0 {
-					ent.Position[0] = pk.Position[0]
+				if posX, ok := pk.PositionX.Value(); ok {
+					ent.Position[0] = posX
 				}
-				if pk.Flags&packet.MoveActorDeltaFlagHasY != 0 {
-					ent.Position[1] = pk.Position[1]
+				if posY, ok := pk.PositionY.Value(); ok {
+					ent.Position[0] = posY
 				}
-				if pk.Flags&packet.MoveActorDeltaFlagHasZ != 0 {
-					ent.Position[2] = pk.Position[2]
+				if posZ, ok := pk.PositionZ.Value(); ok {
+					ent.Position[0] = posZ
 				}
-				if pk.Flags&packet.MoveActorDeltaFlagHasRotX != 0 {
-					ent.Pitch = pk.Rotation.X()
+
+				if rotationX, ok := pk.RotationX.Value(); ok {
+					ent.Pitch = rotationX
 				}
-				if pk.Flags&packet.MoveActorDeltaFlagHasRotY != 0 {
-					ent.Yaw = pk.Rotation.Y()
+				if rotationY, ok := pk.RotationY.Value(); ok {
+					ent.Yaw = rotationY
+				}
+				if rotationYHead, ok := pk.RotationYHead.Value(); ok {
+					ent.HeadYaw = rotationYHead
 				}
 				if !ent.Velocity.ApproxEqual(mgl32.Vec3{}) {
 					ent.HasMoved = true
@@ -492,16 +494,6 @@ func (w *worldsHandler) packetHandlerIngame(_pk packet.Packet, toServer bool, ti
 					}
 				}
 				if sra, ok := sra.(*protocol.DestroyStackRequestAction); ok {
-					if sra.Source.StackNetworkID == mapItem.StackNetworkID {
-						continue
-					}
-				}
-				if sra, ok := sra.(*protocol.PlaceInContainerStackRequestAction); ok {
-					if sra.Source.StackNetworkID == mapItem.StackNetworkID {
-						continue
-					}
-				}
-				if sra, ok := sra.(*protocol.TakeOutContainerStackRequestAction); ok {
 					if sra.Source.StackNetworkID == mapItem.StackNetworkID {
 						continue
 					}

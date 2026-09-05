@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	"image/png"
 	"strconv"
 
@@ -22,8 +23,8 @@ type SkinMeta struct {
 	PremiumSkin   bool
 	PersonaSkin   bool
 	CapeID        string
-	SkinColour    string
-	ArmSize       string
+	SkinColour    color.RGBA
+	ArmSize       uint8
 	Trusted       bool
 	PersonaPieces []protocol.PersonaPiece
 }
@@ -127,7 +128,7 @@ func (sp *SkinPack) Save(fs utils.WriterFS) error {
 			Texture:          skinName + ".png",
 			Type:             "free",
 		}
-		if skin.ArmSize == "wide" {
+		if skin.ArmSize == protocol.ArmSizeWide {
 			entry.Geometry = "minecraft.geometry.steve"
 		} else {
 			entry.Geometry = "minecraft.geometry.alex"

@@ -6,7 +6,6 @@ import (
 
 	"github.com/bedrock-tool/bedrocktool/locale"
 	"github.com/bedrock-tool/bedrocktool/utils/auth"
-	"github.com/bedrock-tool/bedrocktool/utils/auth/xbox"
 	"github.com/bedrock-tool/bedrocktool/utils/commands"
 )
 
@@ -26,13 +25,16 @@ func (RealmListCMD) Settings() any {
 
 func (RealmListCMD) Run(ctx context.Context, settings any) error {
 	if !auth.Auth.LoggedIn() {
-		err := auth.Auth.Login(ctx, &xbox.DeviceTypeAndroid, "")
+		err := auth.Auth.Login(ctx, nil, "")
 		if err != nil {
 			return err
 		}
 	}
-	account := auth.Auth.Account()
-	realms, err := account.Realms().Realms(ctx)
+	realmsClient, err := auth.Auth.Account().Realms(ctx)
+	if err != nil {
+		return err
+	}
+	realms, err := realmsClient.Realms(ctx)
 	if err != nil {
 		return err
 	}

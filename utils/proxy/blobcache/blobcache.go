@@ -120,13 +120,13 @@ func (b *Blobcache) HandleLevelChunk(pk *packet.LevelChunk, timeReceived time.Ti
 
 	var reply packet.ClientCacheBlobStatus
 	var pkFill = &packet.LevelChunk{
-		Position:        pk.Position,
-		Dimension:       pk.Dimension,
-		HighestSubChunk: pk.HighestSubChunk,
-		SubChunkCount:   pk.SubChunkCount,
-		CacheEnabled:    pk.CacheEnabled,
-		BlobHashes:      pk.BlobHashes,
-		RawPayload:      pk.RawPayload,
+		Position:      pk.Position,
+		Dimension:     pk.Dimension,
+		SubChunkCount: pk.SubChunkCount,
+		SubChunkLimit: pk.SubChunkLimit,
+		CacheEnabled:  pk.CacheEnabled,
+		BlobHashes:    pk.BlobHashes,
+		RawPayload:    pk.RawPayload,
 	}
 	var wait = serverWait{pkFill: pkFill}
 	var hitBlobs []protocol.CacheBlob
@@ -176,16 +176,20 @@ func (b *Blobcache) HandleSubChunk(pk *packet.SubChunk, timeReceived time.Time, 
 			pos  = protocol.ChunkPos{absX, absZ}
 		)
 		dependingChunks[pos] = struct{}{}
+		blobHash, hasBlobHash := entry.BlobHash.Value()
+		if !hasBlobHash {
+			continue
+		}
 
-		blob, err := b.loadBlob(entry.BlobHash)
+		blob, err := b.loadBlob(blobHash)
 		if err != nil {
 			return nil, err
 		}
 		if blob != nil {
-			reply.HitHashes = append(reply.HitHashes, entry.BlobHash)
-			hitBlobs = append(hitBlobs, protocol.CacheBlob{Hash: entry.BlobHash, Payload: blob})
+			reply.HitHashes = append(reply.HitHashes, blobHash)
+			hitBlobs = append(hitBlobs, protocol.CacheBlob{Hash: blobHash, Payload: blob})
 		} else {
-			b.addServerWait(&reply, &wait, entry.BlobHash)
+			b.addServerWait(&reply, &wait, blobHash)
 		}
 	}
 
@@ -321,16 +325,17 @@ func (b *Blobcache) serverResolve(wait *serverWait, timeReceived time.Time, preL
 	case *packet.SubChunk:
 		for i := 0; i < len(pk.SubChunkEntries); i++ {
 			entry := &pk.SubChunkEntries[i]
-			if entry.BlobHash == 0 {
+			blobHash, hasBlobHash := entry.BlobHash.Value()
+			if !hasBlobHash {
 				continue
 			}
-			blob, err := b.loadBlob(entry.BlobHash)
+			blob, err := b.loadBlob(blobHash)
 			if err != nil {
 				logrus.Error(err)
 				continue
 			}
-			entry.RawPayload = blob
-			entry.BlobHash = 0
+			entry.RawPayload = protocol.Option(blob)
+			entry.BlobHash = protocol.Optional[uint64]{}
 		}
 		pk.CacheEnabled = false
 	}

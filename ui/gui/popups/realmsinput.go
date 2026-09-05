@@ -55,7 +55,11 @@ func (r *RealmsList) Load() error {
 	if account == nil {
 		return auth.ErrNotLoggedIn
 	}
-	realmsList, err := account.Realms().Realms(context.Background())
+	realmsClient, err := account.Realms(context.Background())
+	if err != nil {
+		return err
+	}
+	realmsList, err := realmsClient.Realms(context.Background())
 	if err != nil {
 		return err
 	}
