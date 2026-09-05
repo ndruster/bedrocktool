@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"image/png"
 	"maps"
-	"math/rand"
 	"os"
 	"slices"
 	"strings"
@@ -243,12 +242,8 @@ func (w *worldsHandler) onConnect(_ *proxy.Session) bool {
 		ChunkRadius: w.settings.ChunkRadius,
 	})
 
-	gameData := w.session.Server.GameData()
 	mapItemID, _ := world.ItemRidByName("minecraft:filled_map")
 	mapItem.Stack.ItemType.NetworkID = mapItemID
-	if gameData.ServerAuthoritativeInventory {
-		mapItem.StackNetworkID = 0xffff + rand.Int31n(0xfff)
-	}
 
 	w.session.SendMessage(locale.Loc("use_setname", nil))
 	w.mapUI.Start(w.ctx)

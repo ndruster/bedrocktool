@@ -24,7 +24,7 @@ import (
 const ViewMapID = 0x424242
 
 var mapItem = protocol.ItemInstance{
-	StackNetworkID: 1, // random if auth inv
+	StackNetworkID: 0x424242, // random if auth inv
 	Stack: protocol.ItemStack{
 		ItemType: protocol.ItemType{
 			NetworkID:     420, // overwritten in onconnect
@@ -32,7 +32,7 @@ var mapItem = protocol.ItemInstance{
 		},
 		BlockRuntimeID: 0,
 		Count:          1,
-		NBTData: map[string]interface{}{
+		NBTData: map[string]any{
 			"map_name_index": int64(1),
 			"map_uuid":       int64(ViewMapID),
 		},

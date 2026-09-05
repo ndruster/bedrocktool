@@ -67,7 +67,7 @@ type packetLogger struct {
 func (p *packetLogger) PacketSend(pk packet.Packet, t time.Time) error {
 	p.dumpLock.Lock()
 	defer p.dumpLock.Unlock()
-	return p.logPacket(pk, t, false)
+	return p.logPacket(pk, t, true)
 }
 
 func (p *packetLogger) PacketReceive(pk packet.Packet, t time.Time) error {

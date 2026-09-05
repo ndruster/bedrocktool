@@ -196,6 +196,12 @@ func LookupColor(name string) color.RGBA {
 		return color.RGBA{0x25, 0x17, 0x10, 0xff}
 	case "minecraft:black_wool":
 		return color.RGBA{0x16, 0x17, 0x1b, 0xff}
+	case "minecraft:black_wool_double_slab":
+		return color.RGBA{0x16, 0x17, 0x1b, 0xff}
+	case "minecraft:black_wool_slab":
+		return color.RGBA{0x16, 0x17, 0x1b, 0xff}
+	case "minecraft:black_wool_stairs":
+		return color.RGBA{0x16, 0x17, 0x1b, 0xff}
 	case "minecraft:blackstone":
 		return color.RGBA{0x2c, 0x27, 0x2e, 0xff}
 	case "minecraft:blackstone_double_slab":
@@ -233,6 +239,12 @@ func LookupColor(name string) color.RGBA {
 	case "minecraft:blue_terracotta":
 		return color.RGBA{0x4a, 0x3c, 0x5b, 0xff}
 	case "minecraft:blue_wool":
+		return color.RGBA{0x35, 0x3a, 0x9e, 0xff}
+	case "minecraft:blue_wool_double_slab":
+		return color.RGBA{0x35, 0x3a, 0x9e, 0xff}
+	case "minecraft:blue_wool_slab":
+		return color.RGBA{0x35, 0x3a, 0x9e, 0xff}
+	case "minecraft:blue_wool_stairs":
 		return color.RGBA{0x35, 0x3a, 0x9e, 0xff}
 	case "minecraft:bone_block":
 		return color.RGBA{0xd2, 0xcf, 0xb4, 0xff}
@@ -285,6 +297,12 @@ func LookupColor(name string) color.RGBA {
 	case "minecraft:brown_terracotta":
 		return color.RGBA{0x4d, 0x33, 0x24, 0xff}
 	case "minecraft:brown_wool":
+		return color.RGBA{0x73, 0x48, 0x29, 0xff}
+	case "minecraft:brown_wool_double_slab":
+		return color.RGBA{0x73, 0x48, 0x29, 0xff}
+	case "minecraft:brown_wool_slab":
+		return color.RGBA{0x73, 0x48, 0x29, 0xff}
+	case "minecraft:brown_wool_stairs":
 		return color.RGBA{0x73, 0x48, 0x29, 0xff}
 	case "minecraft:bubble_column":
 		return color.RGBA{0x1d, 0x3f, 0x50, 0xff}
@@ -625,6 +643,12 @@ func LookupColor(name string) color.RGBA {
 	case "minecraft:cyan_terracotta":
 		return color.RGBA{0x57, 0x5b, 0x5b, 0xff}
 	case "minecraft:cyan_wool":
+		return color.RGBA{0x15, 0x8a, 0x91, 0xff}
+	case "minecraft:cyan_wool_double_slab":
+		return color.RGBA{0x15, 0x8a, 0x91, 0xff}
+	case "minecraft:cyan_wool_slab":
+		return color.RGBA{0x15, 0x8a, 0x91, 0xff}
+	case "minecraft:cyan_wool_stairs":
 		return color.RGBA{0x15, 0x8a, 0x91, 0xff}
 	case "minecraft:damaged_anvil":
 		return color.RGBA{0x3b, 0x3a, 0x3a, 0xff}
@@ -1214,6 +1238,12 @@ func LookupColor(name string) color.RGBA {
 		return color.RGBA{0x3a, 0x2a, 0x24, 0xff}
 	case "minecraft:gray_wool":
 		return color.RGBA{0x3f, 0x45, 0x48, 0xff}
+	case "minecraft:gray_wool_double_slab":
+		return color.RGBA{0x3f, 0x45, 0x48, 0xff}
+	case "minecraft:gray_wool_slab":
+		return color.RGBA{0x3f, 0x45, 0x48, 0xff}
+	case "minecraft:gray_wool_stairs":
+		return color.RGBA{0x3f, 0x45, 0x48, 0xff}
 	case "minecraft:green_candle":
 		return color.RGBA{0x15, 0x1c, 0x6, 0xff}
 	case "minecraft:green_candle_cake":
@@ -1235,6 +1265,12 @@ func LookupColor(name string) color.RGBA {
 	case "minecraft:green_terracotta":
 		return color.RGBA{0x4c, 0x53, 0x2a, 0xff}
 	case "minecraft:green_wool":
+		return color.RGBA{0x55, 0x6e, 0x1c, 0xff}
+	case "minecraft:green_wool_double_slab":
+		return color.RGBA{0x55, 0x6e, 0x1c, 0xff}
+	case "minecraft:green_wool_slab":
+		return color.RGBA{0x55, 0x6e, 0x1c, 0xff}
+	case "minecraft:green_wool_stairs":
 		return color.RGBA{0x55, 0x6e, 0x1c, 0xff}
 	case "minecraft:grindstone":
 		return color.RGBA{0x58, 0x58, 0x58, 0xff}
@@ -1458,6 +1494,12 @@ func LookupColor(name string) color.RGBA {
 		return color.RGBA{0x72, 0x6d, 0x8a, 0xff}
 	case "minecraft:light_blue_wool":
 		return color.RGBA{0x3b, 0xb0, 0xda, 0xff}
+	case "minecraft:light_blue_wool_double_slab":
+		return color.RGBA{0x3b, 0xb0, 0xda, 0xff}
+	case "minecraft:light_blue_wool_slab":
+		return color.RGBA{0x3b, 0xb0, 0xda, 0xff}
+	case "minecraft:light_blue_wool_stairs":
+		return color.RGBA{0x3b, 0xb0, 0xda, 0xff}
 	case "minecraft:light_gray_candle":
 		return color.RGBA{0x23, 0x23, 0x21, 0xff}
 	case "minecraft:light_gray_candle_cake":
@@ -1477,6 +1519,12 @@ func LookupColor(name string) color.RGBA {
 	case "minecraft:light_gray_terracotta":
 		return color.RGBA{0x87, 0x6b, 0x62, 0xff}
 	case "minecraft:light_gray_wool":
+		return color.RGBA{0x8e, 0x8e, 0x87, 0xff}
+	case "minecraft:light_gray_wool_double_slab":
+		return color.RGBA{0x8e, 0x8e, 0x87, 0xff}
+	case "minecraft:light_gray_wool_slab":
+		return color.RGBA{0x8e, 0x8e, 0x87, 0xff}
+	case "minecraft:light_gray_wool_stairs":
 		return color.RGBA{0x8e, 0x8e, 0x87, 0xff}
 	case "minecraft:light_weighted_pressure_plate":
 		return color.RGBA{0xf7, 0xd2, 0x44, 0xff}
@@ -1507,6 +1555,12 @@ func LookupColor(name string) color.RGBA {
 	case "minecraft:lime_terracotta":
 		return color.RGBA{0x68, 0x76, 0x35, 0xff}
 	case "minecraft:lime_wool":
+		return color.RGBA{0x71, 0xb9, 0x1a, 0xff}
+	case "minecraft:lime_wool_double_slab":
+		return color.RGBA{0x71, 0xb9, 0x1a, 0xff}
+	case "minecraft:lime_wool_slab":
+		return color.RGBA{0x71, 0xb9, 0x1a, 0xff}
+	case "minecraft:lime_wool_stairs":
 		return color.RGBA{0x71, 0xb9, 0x1a, 0xff}
 	case "minecraft:lit_blast_furnace":
 		return color.RGBA{0x52, 0x52, 0x52, 0xff}
@@ -1551,6 +1605,12 @@ func LookupColor(name string) color.RGBA {
 	case "minecraft:magenta_terracotta":
 		return color.RGBA{0x96, 0x58, 0x6d, 0xff}
 	case "minecraft:magenta_wool":
+		return color.RGBA{0xbe, 0x46, 0xb4, 0xff}
+	case "minecraft:magenta_wool_double_slab":
+		return color.RGBA{0xbe, 0x46, 0xb4, 0xff}
+	case "minecraft:magenta_wool_slab":
+		return color.RGBA{0xbe, 0x46, 0xb4, 0xff}
+	case "minecraft:magenta_wool_stairs":
 		return color.RGBA{0xbe, 0x46, 0xb4, 0xff}
 	case "minecraft:magma":
 		return color.RGBA{0x9e, 0x4c, 0x23, 0xff}
@@ -1724,6 +1784,8 @@ func LookupColor(name string) color.RGBA {
 		return color.RGBA{0xe3, 0x84, 0x22, 0xff}
 	case "minecraft:orange_glazed_terracotta":
 		return color.RGBA{0xbc, 0x99, 0x7a, 0xff}
+	case "minecraft:orange_poplar_leaves":
+		return color.RGBA{0xa2, 0x4c, 0x14, 0xff}
 	case "minecraft:orange_shulker_box":
 		return color.RGBA{0xeb, 0x6b, 0xb, 0xff}
 	case "minecraft:orange_stained_glass":
@@ -1735,6 +1797,12 @@ func LookupColor(name string) color.RGBA {
 	case "minecraft:orange_tulip":
 		return color.RGBA{0x2f, 0x39, 0xe, 0xff}
 	case "minecraft:orange_wool":
+		return color.RGBA{0xf1, 0x77, 0x17, 0xff}
+	case "minecraft:orange_wool_double_slab":
+		return color.RGBA{0xf1, 0x77, 0x17, 0xff}
+	case "minecraft:orange_wool_slab":
+		return color.RGBA{0xf1, 0x77, 0x17, 0xff}
+	case "minecraft:orange_wool_stairs":
 		return color.RGBA{0xf1, 0x77, 0x17, 0xff}
 	case "minecraft:oxeye_daisy":
 		return color.RGBA{0x58, 0x5c, 0x4e, 0xff}
@@ -1852,6 +1920,12 @@ func LookupColor(name string) color.RGBA {
 		return color.RGBA{0x32, 0x40, 0x31, 0xff}
 	case "minecraft:pink_wool":
 		return color.RGBA{0xee, 0x8f, 0xad, 0xff}
+	case "minecraft:pink_wool_double_slab":
+		return color.RGBA{0xee, 0x8f, 0xad, 0xff}
+	case "minecraft:pink_wool_slab":
+		return color.RGBA{0xee, 0x8f, 0xad, 0xff}
+	case "minecraft:pink_wool_stairs":
+		return color.RGBA{0xee, 0x8f, 0xad, 0xff}
 	case "minecraft:piston":
 		return color.RGBA{0x67, 0x67, 0x67, 0xff}
 	case "minecraft:pistonArmCollision":
@@ -1958,6 +2032,40 @@ func LookupColor(name string) color.RGBA {
 		return color.RGBA{0x63, 0x69, 0x65, 0xff}
 	case "minecraft:polished_tuff_wall":
 		return color.RGBA{0x63, 0x69, 0x65, 0xff}
+	case "minecraft:poplar_button":
+		return color.RGBA{0x97, 0x8b, 0x80, 0xff}
+	case "minecraft:poplar_door":
+		return color.RGBA{0x95, 0x89, 0x7f, 0xff}
+	case "minecraft:poplar_double_slab":
+		return color.RGBA{0x97, 0x8b, 0x80, 0xff}
+	case "minecraft:poplar_fence":
+		return color.RGBA{0x97, 0x8b, 0x80, 0xff}
+	case "minecraft:poplar_fence_gate":
+		return color.RGBA{0x97, 0x8b, 0x80, 0xff}
+	case "minecraft:poplar_hanging_sign":
+		return color.RGBA{0x97, 0x8b, 0x80, 0xff}
+	case "minecraft:poplar_log":
+		return color.RGBA{0x8d, 0x81, 0x70, 0xff}
+	case "minecraft:poplar_planks":
+		return color.RGBA{0x97, 0x8b, 0x80, 0xff}
+	case "minecraft:poplar_pressure_plate":
+		return color.RGBA{0x97, 0x8b, 0x80, 0xff}
+	case "minecraft:poplar_sapling":
+		return color.RGBA{0x51, 0x2c, 0x14, 0xff}
+	case "minecraft:poplar_shelf":
+		return color.RGBA{0x95, 0x89, 0x7f, 0xff}
+	case "minecraft:poplar_slab":
+		return color.RGBA{0x97, 0x8b, 0x80, 0xff}
+	case "minecraft:poplar_stairs":
+		return color.RGBA{0x97, 0x8b, 0x80, 0xff}
+	case "minecraft:poplar_standing_sign":
+		return color.RGBA{0x97, 0x8b, 0x80, 0xff}
+	case "minecraft:poplar_trapdoor":
+		return color.RGBA{0x8f, 0x84, 0x7a, 0xff}
+	case "minecraft:poplar_wall_sign":
+		return color.RGBA{0x97, 0x8b, 0x80, 0xff}
+	case "minecraft:poplar_wood":
+		return color.RGBA{0x50, 0x3d, 0x2b, 0xff}
 	case "minecraft:poppy":
 		return color.RGBA{0x39, 0x1b, 0xe, 0xff}
 	case "minecraft:portal":
@@ -2015,6 +2123,12 @@ func LookupColor(name string) color.RGBA {
 	case "minecraft:purple_terracotta":
 		return color.RGBA{0x76, 0x46, 0x56, 0xff}
 	case "minecraft:purple_wool":
+		return color.RGBA{0x7b, 0x2b, 0xad, 0xff}
+	case "minecraft:purple_wool_double_slab":
+		return color.RGBA{0x7b, 0x2b, 0xad, 0xff}
+	case "minecraft:purple_wool_slab":
+		return color.RGBA{0x7b, 0x2b, 0xad, 0xff}
+	case "minecraft:purple_wool_stairs":
 		return color.RGBA{0x7b, 0x2b, 0xad, 0xff}
 	case "minecraft:purpur_block":
 		return color.RGBA{0xab, 0x7f, 0xaa, 0xff}
@@ -2076,6 +2190,8 @@ func LookupColor(name string) color.RGBA {
 		return color.RGBA{0x49, 0xa, 0xc, 0xff}
 	case "minecraft:red_nether_brick_wall":
 		return color.RGBA{0x49, 0xa, 0xc, 0xff}
+	case "minecraft:red_poplar_leaves":
+		return color.RGBA{0x86, 0x27, 0x21, 0xff}
 	case "minecraft:red_sand":
 		return color.RGBA{0xbf, 0x67, 0x21, 0xff}
 	case "minecraft:red_sandstone":
@@ -2088,6 +2204,8 @@ func LookupColor(name string) color.RGBA {
 		return color.RGBA{0xb5, 0x62, 0x20, 0xff}
 	case "minecraft:red_sandstone_wall":
 		return color.RGBA{0xbc, 0x64, 0x1f, 0xff}
+	case "minecraft:red_shrub":
+		return color.RGBA{0x5d, 0x1b, 0x11, 0xff}
 	case "minecraft:red_shulker_box":
 		return color.RGBA{0x8d, 0x20, 0x1e, 0xff}
 	case "minecraft:red_stained_glass":
@@ -2099,6 +2217,12 @@ func LookupColor(name string) color.RGBA {
 	case "minecraft:red_tulip":
 		return color.RGBA{0x30, 0x3b, 0x10, 0xff}
 	case "minecraft:red_wool":
+		return color.RGBA{0xa1, 0x28, 0x23, 0xff}
+	case "minecraft:red_wool_double_slab":
+		return color.RGBA{0xa1, 0x28, 0x23, 0xff}
+	case "minecraft:red_wool_slab":
+		return color.RGBA{0xa1, 0x28, 0x23, 0xff}
+	case "minecraft:red_wool_stairs":
 		return color.RGBA{0xa1, 0x28, 0x23, 0xff}
 	case "minecraft:redstone_block":
 		return color.RGBA{0xb4, 0x1a, 0x6, 0xff}
@@ -2168,6 +2292,8 @@ func LookupColor(name string) color.RGBA {
 		return color.RGBA{0x58, 0x61, 0x32, 0xff}
 	case "minecraft:seagrass":
 		return color.RGBA{0x1d, 0x46, 0x9, 0xff}
+	case "minecraft:shelf_mushroom":
+		return color.RGBA{0xb1, 0x74, 0x44, 0xff}
 	case "minecraft:short_dry_grass":
 		return color.RGBA{0x51, 0x46, 0x31, 0xff}
 	case "minecraft:short_grass":
@@ -2366,6 +2492,10 @@ func LookupColor(name string) color.RGBA {
 		return color.RGBA{0xec, 0xe4, 0xe2, 0xff}
 	case "minecraft:stripped_pale_oak_wood":
 		return color.RGBA{0xf6, 0xee, 0xed, 0xff}
+	case "minecraft:stripped_poplar_log":
+		return color.RGBA{0x98, 0x8c, 0x82, 0xff}
+	case "minecraft:stripped_poplar_wood":
+		return color.RGBA{0xa5, 0x99, 0x8c, 0xff}
 	case "minecraft:stripped_spruce_log":
 		return color.RGBA{0x6d, 0x52, 0x30, 0xff}
 	case "minecraft:stripped_spruce_wood":
@@ -2726,6 +2856,12 @@ func LookupColor(name string) color.RGBA {
 		return color.RGBA{0x2f, 0x47, 0x2c, 0xff}
 	case "minecraft:white_wool":
 		return color.RGBA{0xea, 0xed, 0xed, 0xff}
+	case "minecraft:white_wool_double_slab":
+		return color.RGBA{0xea, 0xed, 0xed, 0xff}
+	case "minecraft:white_wool_slab":
+		return color.RGBA{0xea, 0xed, 0xed, 0xff}
+	case "minecraft:white_wool_stairs":
+		return color.RGBA{0xea, 0xed, 0xed, 0xff}
 	case "minecraft:wildflowers":
 		return color.RGBA{0x74, 0x69, 0x47, 0xff}
 	case "minecraft:wither_rose":
@@ -2758,6 +2894,8 @@ func LookupColor(name string) color.RGBA {
 		return color.RGBA{0x3f, 0x3f, 0x12, 0xff}
 	case "minecraft:yellow_glazed_terracotta":
 		return color.RGBA{0xed, 0xc5, 0x6d, 0xff}
+	case "minecraft:yellow_poplar_leaves":
+		return color.RGBA{0xb7, 0x76, 0x22, 0xff}
 	case "minecraft:yellow_shulker_box":
 		return color.RGBA{0xf8, 0xbd, 0x1e, 0xff}
 	case "minecraft:yellow_stained_glass":
@@ -2767,6 +2905,12 @@ func LookupColor(name string) color.RGBA {
 	case "minecraft:yellow_terracotta":
 		return color.RGBA{0xba, 0x85, 0x23, 0xff}
 	case "minecraft:yellow_wool":
+		return color.RGBA{0xf9, 0xc6, 0x29, 0xff}
+	case "minecraft:yellow_wool_double_slab":
+		return color.RGBA{0xf9, 0xc6, 0x29, 0xff}
+	case "minecraft:yellow_wool_slab":
+		return color.RGBA{0xf9, 0xc6, 0x29, 0xff}
+	case "minecraft:yellow_wool_stairs":
 		return color.RGBA{0xf9, 0xc6, 0x29, 0xff}
 	case "minecraft:zombie_head":
 		return color.RGBA{0x54, 0x40, 0x35, 0xff}

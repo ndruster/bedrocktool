@@ -479,32 +479,29 @@ func (w *worldsHandler) packetHandlerIngame(_pk packet.Packet, toServer bool, ti
 			world.AddEntityLink(pk.EntityLink)
 		})
 
+	case *packet.InventoryTransaction:
+		var drop bool
+		for _, action := range pk.Actions {
+			if action.OldItem.StackNetworkID == mapItem.StackNetworkID {
+				drop = true
+			}
+			if action.NewItem.StackNetworkID == mapItem.StackNetworkID {
+				drop = true
+			}
+		}
+		if drop {
+			_pk = nil
+		}
+
 	case *packet.ItemStackRequest:
 		var requests []protocol.ItemStackRequest
-		for _, isr := range pk.Requests {
-			for _, sra := range isr.Actions {
-				if sra, ok := sra.(*protocol.TakeStackRequestAction); ok {
-					if sra.Source.StackNetworkID == mapItem.StackNetworkID {
-						continue
-					}
-				}
-				if sra, ok := sra.(*protocol.DropStackRequestAction); ok {
-					if sra.Source.StackNetworkID == mapItem.StackNetworkID {
-						continue
-					}
-				}
-				if sra, ok := sra.(*protocol.DestroyStackRequestAction); ok {
-					if sra.Source.StackNetworkID == mapItem.StackNetworkID {
-						continue
-					}
-				}
-				if sra, ok := sra.(*protocol.DestroyStackRequestAction); ok {
-					if sra.Source.StackNetworkID == mapItem.StackNetworkID {
-						continue
-					}
+		for _, request := range pk.Requests {
+			for _, action := range request.Actions {
+				if containsStackNetworkID(action, mapItem.StackNetworkID) {
+					continue
 				}
 			}
-			requests = append(requests, isr)
+			requests = append(requests, request)
 		}
 		pk.Requests = requests
 
@@ -777,4 +774,46 @@ func (w *worldsHandler) onEntityUpdate(
 	if w.scripting != nil {
 		w.scripting.OnEntityUpdate(ent, prevPosition, changedProperties, w.session.Now())
 	}
+}
+
+func containsStackNetworkID(action protocol.StackRequestAction, target int32) bool {
+	switch action := action.(type) {
+	case *protocol.TakeStackRequestAction:
+		return action.Source.StackNetworkID == target
+	case *protocol.PlaceStackRequestAction:
+		return action.Source.StackNetworkID == target
+	case *protocol.SwapStackRequestAction:
+		return action.Source.StackNetworkID == target
+	case *protocol.DropStackRequestAction:
+		return action.Source.StackNetworkID == target
+	case *protocol.DestroyStackRequestAction:
+		return action.Source.StackNetworkID == target
+	case *protocol.ConsumeStackRequestAction:
+		return action.Source.StackNetworkID == target
+	case *protocol.CreateStackRequestAction:
+		return false
+	case *protocol.LabTableCombineStackRequestAction:
+		return false
+	case *protocol.BeaconPaymentStackRequestAction:
+		return false
+	case *protocol.MineBlockStackRequestAction:
+		return action.StackNetworkID == target
+	case *protocol.CraftRecipeStackRequestAction:
+		return false
+	case *protocol.AutoCraftRecipeStackRequestAction:
+		return false
+	case *protocol.CraftCreativeStackRequestAction:
+		return false
+	case *protocol.CraftRecipeOptionalStackRequestAction:
+		return false
+	case *protocol.CraftGrindstoneRecipeStackRequestAction:
+		return false
+	case *protocol.CraftLoomRecipeStackRequestAction:
+		return false
+	case *protocol.CraftNonImplementedStackRequestAction:
+		return false
+	case *protocol.CraftResultsDeprecatedStackRequestAction:
+		return false
+	}
+	return false
 }
