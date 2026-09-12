@@ -2,25 +2,24 @@ package updater
 
 import (
 	"bytes"
-	"compress/gzip"
 	"crypto"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"hash/crc32"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"runtime"
-	"sync"
+	"strings"
+	"sync/atomic"
 
 	"github.com/bedrock-tool/bedrocktool/locale"
-	"github.com/bedrock-tool/bedrocktool/ui"
 	"github.com/bedrock-tool/bedrocktool/ui/messages"
 	"github.com/bedrock-tool/bedrocktool/utils"
 	"github.com/minio/selfupdate"
-	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/sirupsen/logrus"
 )
 
@@ -33,7 +32,10 @@ type progressWriter struct {
 
 func (p *progressWriter) Write(b []byte) (int, error) {
 	p.done += len(b)
-	percent := (p.done * 100) / (p.Total * 100)
+	percent := 100
+	if p.Total > 0 {
+		percent = (p.done * 100) / p.Total
+	}
 	if p.percent != percent {
 		p.OnProgress(percent)
 		p.percent = percent
@@ -43,18 +45,13 @@ func (p *progressWriter) Write(b []byte) (int, error) {
 
 const updateFilename = "bedrocktool-update.bin"
 
-const UpdateServer = "https://updates.yuv.pink/"
+const githubLatestReleaseURL = "https://api.github.com/repos/bedrock-tool/bedrocktool/releases/latest"
 
 func fetchHttp(url string) (io.ReadCloser, int, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, 0, err
 	}
-	// set user agent to know what versions are run
-	h, _ := os.Hostname()       // sent as crc32 hashed
-	v, _ := mem.VirtualMemory() // how much ram you have
-	req.Header.Add("User-Agent", fmt.Sprintf("%s '%s' %d %d %d", utils.CmdName, utils.Version, crc32.ChecksumIEEE([]byte(h)), runtime.NumCPU(), v.Total))
-
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, 0, err
@@ -63,30 +60,18 @@ func fetchHttp(url string) (io.ReadCloser, int, error) {
 	if resp.StatusCode != 200 {
 		return nil, 0, fmt.Errorf("bad http status from %s: %v", url, resp.Status)
 	}
-
 	return resp.Body, int(resp.ContentLength), nil
 }
 
-type Updater struct {
-	Update *Update
-}
+var cachedUpdate atomic.Pointer[Update]
 
-func (u *Updater) CheckUpdate() {
+func CheckUpdate() {
 	err := func() error {
-		r, _, err := fetchHttp(fmt.Sprintf("%s%s/%s-%s.json", UpdateServer, utils.CmdName, runtime.GOOS, runtime.GOARCH))
+		update, err := GetLatest()
 		if err != nil {
 			return err
 		}
-		defer r.Close()
-		d := json.NewDecoder(r)
-
-		var update Update
-		if err = d.Decode(&update); err != nil {
-			return err
-		}
-		u.Update = &update
-
-		isNew := update.Version != utils.Version
+		isNew := isNewVersion(update.Version)
 		if isNew {
 			logrus.Info(locale.Loc("update_available", locale.Strmap{"Version": update.Version}))
 			messages.SendEvent(&messages.EventUpdateAvailable{
@@ -100,33 +85,47 @@ func (u *Updater) CheckUpdate() {
 	}
 }
 
-func (u *Updater) DownloadUpdate() error {
-	if u.Update == nil {
-		return fmt.Errorf("no update available")
+func GetLatest() (*Update, error) {
+	if update := cachedUpdate.Load(); update != nil {
+		return update, nil
 	}
-	checksum, err := base64.StdEncoding.DecodeString(u.Update.Sha256)
+
+	if runtime.GOOS == "android" || runtime.GOOS == "js" {
+		cachedUpdate.Store(&Update{
+			Version: utils.Version,
+		})
+		return cachedUpdate.Load(), nil
+	}
+
+	update, err := latestUpdate()
+	if err != nil {
+		return nil, err
+	}
+	cachedUpdate.Store(update)
+	return update, nil
+}
+
+func DoUpdate(update *Update) error {
+	checksum, err := base64.StdEncoding.DecodeString(update.Sha256)
 	if err != nil {
 		return err
 	}
 
-	r, size, err := fetchHttp(fmt.Sprintf("%s%s/%s/%s-%s.gz", UpdateServer, utils.CmdName, u.Update.Version, runtime.GOOS, runtime.GOARCH))
+	r, size, err := fetchHttp(update.DownloadURL)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
-
-	gr, err := gzip.NewReader(r)
-	if err != nil {
-		return err
-	}
-	defer gr.Close()
 
 	updatePath := utils.PathCache(updateFilename)
 	f, err := os.Create(updatePath)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		f.Close()
+		os.Remove(updatePath)
+	}()
 
 	sum := sha256.New()
 	mw := io.MultiWriter(f, sum, &progressWriter{
@@ -137,7 +136,7 @@ func (u *Updater) DownloadUpdate() error {
 		},
 		Total: size,
 	})
-	_, err = io.Copy(mw, gr)
+	_, err = io.Copy(mw, r)
 	if err != nil {
 		return err
 	}
@@ -145,11 +144,9 @@ func (u *Updater) DownloadUpdate() error {
 	if !bytes.Equal(checksum, sum.Sum(nil)) {
 		return fmt.Errorf("update checksum mismatch")
 	}
-	return nil
-}
 
-func (u *Updater) InstallUpdate() error {
-	updatePath := utils.PathCache(updateFilename)
+	// install
+
 	messages.SendEvent(&messages.EventUpdateDoInstall{
 		Filepath: updatePath,
 	})
@@ -162,7 +159,7 @@ func (u *Updater) InstallUpdate() error {
 		defer os.Remove(f.Name())
 		defer f.Close()
 
-		checksum, err := base64.StdEncoding.DecodeString(u.Update.Sha256)
+		checksum, err := base64.StdEncoding.DecodeString(update.Sha256)
 		if err != nil {
 			return err
 		}
@@ -177,66 +174,80 @@ func (u *Updater) InstallUpdate() error {
 	return nil
 }
 
-type Update struct {
-	Version string
-	Sha256  string
+func Restart() error {
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+
+	process := exec.Command(executable, os.Args[1:]...)
+	process.Dir, err = os.Getwd()
+	if err != nil {
+		return err
+	}
+	return process.Start()
 }
 
-var updateAvailable *Update
-var updateAvailableMutex sync.Mutex
+type Update struct {
+	Version     string
+	Sha256      string
+	DownloadURL string
+}
 
-func UpdateAvailable() (*Update, error) {
-	updateAvailableMutex.Lock()
-	defer updateAvailableMutex.Unlock()
-	if updateAvailable != nil {
-		return updateAvailable, nil
-	}
+type githubRelease struct {
+	TagName string        `json:"tag_name"`
+	Assets  []githubAsset `json:"assets"`
+}
 
-	if runtime.GOOS == "android" {
-		updateAvailable = &Update{
-			Version: utils.Version,
-			Sha256:  "",
-		}
-		return updateAvailable, nil
-	}
+type githubAsset struct {
+	Name               string `json:"name"`
+	Digest             string `json:"digest"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+}
 
-	if runtime.GOOS == "js" {
-		updateAvailable = &Update{
-			Version: utils.Version,
-			Sha256:  "",
-		}
-		return updateAvailable, nil
-	}
+func isNewVersion(version string) bool {
+	return utils.Version != version && !strings.HasPrefix(utils.Version, version+"-")
+}
 
-	r, _, err := fetchHttp(fmt.Sprintf("%s%s/%s-%s.json", UpdateServer, utils.CmdName, runtime.GOOS, runtime.GOARCH))
+func (u *Update) IsNew() bool {
+	return isNewVersion(u.Version)
+}
+
+func latestUpdate() (*Update, error) {
+	r, _, err := fetchHttp(githubLatestReleaseURL)
 	if err != nil {
 		return nil, err
 	}
 	defer r.Close()
-	d := json.NewDecoder(r)
 
-	var update Update
-	err = d.Decode(&update)
-	if err != nil {
+	var release githubRelease
+	if err := json.NewDecoder(r).Decode(&release); err != nil {
 		return nil, err
 	}
 
-	updateAvailable = &update
-	return updateAvailable, nil
-}
-
-func UpdateCheck(ui ui.UI) {
-	update, err := UpdateAvailable()
-	if err != nil {
-		logrus.Warn(err)
-		return
+	version := strings.TrimPrefix(release.TagName, "r")
+	assetPrefix := fmt.Sprintf("%s-%s-%s-", utils.CmdName, runtime.GOOS, runtime.GOARCH)
+	assetSuffix := ""
+	if runtime.GOOS == "windows" {
+		assetSuffix = ".exe"
 	}
-	isNew := update.Version != utils.Version
-
-	if isNew {
-		logrus.Info(locale.Loc("update_available", locale.Strmap{"Version": update.Version}))
-		messages.SendEvent(&messages.EventUpdateAvailable{
-			Version: update.Version,
-		})
+	for _, asset := range release.Assets {
+		if !strings.HasPrefix(asset.Name, assetPrefix) || !strings.HasSuffix(asset.Name, assetSuffix) {
+			continue
+		}
+		if !strings.HasPrefix(asset.Digest, "sha256:") {
+			return nil, fmt.Errorf("GitHub asset %s has no SHA-256 digest", asset.Name)
+		}
+		digest, err := hex.DecodeString(strings.TrimPrefix(asset.Digest, "sha256:"))
+		if err != nil {
+			return nil, fmt.Errorf("invalid SHA-256 digest for GitHub asset %s: %w", asset.Name, err)
+		}
+		return &Update{
+			Version:     version,
+			Sha256:      base64.StdEncoding.EncodeToString(digest),
+			DownloadURL: asset.BrowserDownloadURL,
+		}, nil
 	}
+
+	return nil, fmt.Errorf("no GitHub release asset matching %s", assetPrefix)
 }
