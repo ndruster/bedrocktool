@@ -2,12 +2,7 @@ package main
 
 import (
 	"bytes"
-	"compress/gzip"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -83,22 +78,6 @@ func (c *BuildConfig) writeGitHubOutput(name, value string) {
 	} else {
 		log.Printf("::notice file=build.go::GITHUB_OUTPUT %s=%s", name, value)
 	}
-}
-
-func sha256File(path string) (string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", fmt.Errorf("failed to open file %s: %w", path, err)
-	}
-	defer file.Close()
-
-	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
-		return "", fmt.Errorf("failed to calculate hash for %s: %w", path, err)
-	}
-
-	hashSum := hash.Sum(nil)
-	return base64.StdEncoding.EncodeToString(hashSum), nil
 }
 
 // findAndroidToolchain finds the clang compiler path within the Android NDK.
@@ -496,76 +475,10 @@ func (c *BuildConfig) doBuild(build Build) error {
 
 	log.Printf("Successfully built: %s", outputPath)
 
-	if build.OS != "wasm" && build.OS != "android" {
-		err := createUpdate(build, outputPath, c.BuildTag)
-		if err != nil {
-			return err
-		}
-	}
-
 	if build.Type == "gui" && build.OS == "windows" {
 		cleanSyso()
 	}
 
-	return nil
-}
-
-func createUpdate(build Build, outputPath, buildTag string) error {
-	exeHash, err := sha256File(outputPath)
-	if err != nil {
-		log.Printf("Warning: Could not calculate file hash for %s: %v. Skipping update file creation.", outputPath, err)
-		return nil
-	}
-
-	updatesDirName := AppName
-	if build.Type == "gui" {
-		updatesDirName += "-gui"
-	}
-	updatesBaseDir := "updates"
-	updatesDir := filepath.Join(updatesBaseDir, updatesDirName)
-	if err := os.MkdirAll(updatesDir, 0755); err != nil {
-		return fmt.Errorf("failed to create updates directory %s: %w", updatesDir, err)
-	}
-
-	updateInfoPath := filepath.Join(updatesDir, fmt.Sprintf("%s-%s.json", build.OS, build.Arch))
-	updateInfo := map[string]string{
-		"Version": buildTag,
-		"Sha256":  exeHash,
-	}
-	updateInfoBytes, err := json.MarshalIndent(updateInfo, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal update info JSON for %s: %w", updateInfoPath, err)
-	}
-	if err := os.WriteFile(updateInfoPath, updateInfoBytes, 0644); err != nil {
-		return fmt.Errorf("failed to write update info file %s: %w", updateInfoPath, err)
-	}
-	log.Printf("Generated update info file: %s", updateInfoPath)
-
-	compressedUpdatesDir := filepath.Join(updatesDir, buildTag)
-	if err := os.MkdirAll(compressedUpdatesDir, 0755); err != nil {
-		return fmt.Errorf("failed to create compressed updates directory %s: %w", compressedUpdatesDir, err)
-	}
-	compressedFilePath := filepath.Join(compressedUpdatesDir, fmt.Sprintf("%s-%s.gz", build.OS, build.Arch))
-
-	compressedFile, err := os.Create(compressedFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to create compressed update file %s: %w", compressedFilePath, err)
-	}
-	defer compressedFile.Close()
-
-	gzipWriter := gzip.NewWriter(compressedFile)
-	defer gzipWriter.Close()
-
-	exeFile, err := os.Open(outputPath)
-	if err != nil {
-		return fmt.Errorf("failed to open executable for compression %s: %w", outputPath, err)
-	}
-	defer exeFile.Close()
-
-	if _, err := io.Copy(gzipWriter, exeFile); err != nil {
-		return fmt.Errorf("failed to compress executable to %s: %w", compressedFilePath, err)
-	}
-	log.Printf("Generated compressed update file: %s", compressedFilePath)
 	return nil
 }
 
@@ -611,18 +524,12 @@ func main() {
 		log.Println("GITHUB_OUTPUT environment variable not set. Writing outputs to stderr.")
 	}
 
-	log.Println("Cleaning existing builds and updates directories...")
+	log.Println("Cleaning existing builds directory...")
 	if err := os.RemoveAll("builds"); err != nil && !os.IsNotExist(err) {
 		log.Printf("Error cleaning builds directory: %v", err)
 	}
 	if err := os.MkdirAll("builds", 0755); err != nil {
 		log.Fatalf("Error creating builds directory: %v", err)
-	}
-	if err := os.RemoveAll("updates"); err != nil && !os.IsNotExist(err) {
-		log.Fatalf("Error cleaning updates directory: %v", err)
-	}
-	if err := os.MkdirAll("updates", 0755); err != nil {
-		log.Fatalf("Error creating updates directory: %v", err)
 	}
 
 	if err := buildCfg.getVersion(); err != nil {

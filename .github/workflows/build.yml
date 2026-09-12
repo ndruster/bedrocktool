@@ -10,15 +10,6 @@ jobs:
     name: Build
     runs-on: "ubuntu-latest"
     steps:
-      - name: Install SSH Key
-        if: ${{ env.SSH_PRIVATE_KEY != '' }}
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          known_hosts: ${{ secrets.KNOWN_HOSTS }}
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-
       - uses: awalsh128/cache-apt-pkgs-action@latest
         if: ${{ env.REPO_KEY != '' }}
         with:
@@ -59,12 +50,6 @@ jobs:
         id: build
         run: |
           go run ./build.go windows,linux gui,cli
-
-      - name: Deploy with rsync
-        if: ${{ env.SSH_HOST != '' }}
-        run: rsync -avzO ./updates/ olebeck@${SSH_HOST}:/var/www/updates/
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
       
       - name: 🏷️ Create/update tag
         uses: actions/github-script@v7
